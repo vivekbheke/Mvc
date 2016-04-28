@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.ComponentModel;
 using System.Globalization;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -169,6 +170,20 @@ namespace Microsoft.AspNetCore.Mvc.Internal
             Assert.Equal(expectedException, ex.Message);
         }
 
+        [Theory]
+        [InlineData("EchoWithDefaultValue", "hello")]
+        [InlineData("EchoWithNoDefaultAttribute", null)]
+        [InlineData("EchoIntValueTypeWithNoDefaultValue", 0)]
+        [InlineData("EchoBoolValueTypeWithNoDefaultValue", false)]
+        public void GetDefaultValueForParameter_ReturnsExpectedValues(string methodName, object expectedValue)
+        {
+            var executor = GetExecutorForMethod(methodName);
+            var defaultValue = executor.GetDefaultValueForParameter(0);
+
+            Assert.Equal(expectedValue, defaultValue);
+
+        }
+
         private ObjectMethodExecutor GetExecutorForMethod(string methodName)
         {
             var method = typeof(TestObject).GetMethod(methodName);
@@ -237,6 +252,26 @@ namespace Microsoft.AspNetCore.Mvc.Internal
             public TaskOfTDerivedType<int> TaskActionWithCustomTaskOfTReturnType(int i, string s)
             {
                 return new TaskOfTDerivedType<int>(1);
+            }
+
+            public string EchoWithDefaultValue([DefaultValue("hello")] string input)
+            {
+                return input;
+            }
+
+            public string EchoWithNoDefaultAttribute(string input)
+            {
+                return input;
+            }
+
+            public int EchoIntValueTypeWithNoDefaultValue(int input)
+            {
+                return input;
+            }
+
+            public bool EchoBoolValueTypeWithNoDefaultValue(bool input)
+            {
+                return input;
             }
 
             public class TaskDerivedType : Task
