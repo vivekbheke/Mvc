@@ -3,6 +3,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -14,6 +16,7 @@ namespace Microsoft.AspNetCore.Mvc.Internal
 {
     public class ObjectMethodExecutor
     {
+        private object[] _parameterDefaultValues;
         private ActionExecutorAsync _executorAsync;
         private ActionExecutor _executor;
 
@@ -39,6 +42,7 @@ namespace Microsoft.AspNetCore.Mvc.Internal
                 throw new ArgumentNullException(nameof(methodInfo));
             }
             MethodInfo = methodInfo;
+            ActionParameters = methodInfo.GetParameters();
         }
 
         private delegate Task<object> ActionExecutorAsync(object target, object[] parameters);
@@ -48,6 +52,8 @@ namespace Microsoft.AspNetCore.Mvc.Internal
         private delegate void VoidActionExecutor(object target, object[] parameters);
 
         public MethodInfo MethodInfo { get; }
+
+        public ParameterInfo[] ActionParameters { get; }
 
         public static ObjectMethodExecutor Create(MethodInfo methodInfo, TypeInfo targetTypeInfo)
         {
@@ -65,6 +71,39 @@ namespace Microsoft.AspNetCore.Mvc.Internal
         public object Execute(object target, object[] parameters)
         {
             return _executor(target, parameters);
+        }
+
+        public object GetDefaultValueForParameter(int index)
+        {
+            Debug.Assert(ActionParameters.Length > 0);
+
+            var parameterInfo = ActionParameters[index];
+            if (_parameterDefaultValues == null)
+            {
+                _parameterDefaultValues = new object[ActionParameters.Length];
+            }
+
+            var defaultValue = _parameterDefaultValues[index];
+            if (defaultValue == null)
+            {
+                var defaultValueAttribute =
+                            parameterInfo.GetCustomAttribute<DefaultValueAttribute>(inherit: false);
+
+                if (defaultValueAttribute?.Value == null)
+                {
+                    defaultValue = parameterInfo.ParameterType.GetTypeInfo().IsValueType
+                        ? Activator.CreateInstance(parameterInfo.ParameterType)
+                        : null;
+                }
+                else
+                {
+                    defaultValue = defaultValueAttribute.Value;
+                }
+
+                _parameterDefaultValues[index] = defaultValue;
+            }
+
+            return defaultValue;
         }
 
         private static ActionExecutor GetExecutor(MethodInfo methodInfo, TypeInfo targetTypeInfo)
