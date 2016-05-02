@@ -12,6 +12,7 @@ using System.Text;
 using System.Threading;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Razor.Compilation;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -29,7 +30,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
     /// </summary>
     public class DefaultRoslynCompilationService : ICompilationService
     {
-        private readonly IHostingEnvironment _hostingEnvironment;
+        private readonly ApplicationPartManager _partManager;
         private readonly IFileProvider _fileProvider;
         private readonly Action<RoslynCompilationContext> _compilationCallback;
         private readonly CSharpParseOptions _parseOptions;
@@ -42,17 +43,17 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
         /// <summary>
         /// Initalizes a new instance of the <see cref="DefaultRoslynCompilationService"/> class.
         /// </summary>
-        /// <param name="environment">The <see cref="IHostingEnvironment"/>.</param>
+        /// <param name="partManager">The <see cref="ApplicationPartManager"/>.</param>
         /// <param name="optionsAccessor">Accessor to <see cref="RazorViewEngineOptions"/>.</param>
         /// <param name="fileProviderAccessor">The <see cref="IRazorViewEngineFileProviderAccessor"/>.</param>
         /// <param name="loggerFactory">The <see cref="ILoggerFactory"/>.</param>
         public DefaultRoslynCompilationService(
-            IHostingEnvironment environment,
+            ApplicationPartManager partManager,
             IOptions<RazorViewEngineOptions> optionsAccessor,
             IRazorViewEngineFileProviderAccessor fileProviderAccessor,
             ILoggerFactory loggerFactory)
         {
-            _hostingEnvironment = environment;
+            _partManager = partManager;
             _fileProvider = fileProviderAccessor.FileProvider;
             _compilationCallback = optionsAccessor.Value.CompilationCallback;
             _parseOptions = optionsAccessor.Value.ParseOptions;
@@ -154,17 +155,16 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
         /// <summary>
         /// Gets the <see cref="DependencyContext"/>.
         /// </summary>
-        /// <param name="hostingEnvironment">The <see cref="IHostingEnvironment"/>.</param>
+        /// <param name="assembly">The <see cref="Assembly"/> to load the <see cref="DependencyContext"/> for.</param>
         /// <returns>The <see cref="DependencyContext"/>.</returns>
-        protected virtual DependencyContext GetDependencyContext(IHostingEnvironment hostingEnvironment)
+        protected virtual DependencyContext GetDependencyContext(Assembly assembly)
         {
-            if (hostingEnvironment.ApplicationName != null)
+            if (assembly == null)
             {
-                var applicationAssembly = Assembly.Load(new AssemblyName(hostingEnvironment.ApplicationName));
-                return DependencyContext.Load(applicationAssembly);
+                throw new ArgumentNullException(nameof(assembly));
             }
 
-            return null;
+            return DependencyContext.Load(assembly);
         }
 
         private Assembly LoadStream(MemoryStream assemblyStream, MemoryStream pdbStream)
@@ -243,32 +243,30 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Internal
         private List<MetadataReference> GetApplicationReferences()
         {
             var metadataReferences = new List<MetadataReference>();
-            var dependencyContext = GetDependencyContext(_hostingEnvironment);
-            if (dependencyContext == null)
+            foreach (var part in _partManager.ApplicationParts.OfType<AssemblyPart>())
             {
-                // Avoid null ref if the entry point does not have DependencyContext specified.
-                return metadataReferences;
-            }
+                var dependencyContext = GetDependencyContext(part.Assembly);
 
-            var libraryPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            for (var i = 0; i < dependencyContext.CompileLibraries.Count; i++)
-            {
-                var library = dependencyContext.CompileLibraries[i];
-                IEnumerable<string> referencePaths;
-                try
+                var libraryPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (var i = 0; i < dependencyContext.CompileLibraries.Count; i++)
                 {
-                    referencePaths = library.ResolveReferencePaths();
-                }
-                catch (InvalidOperationException)
-                {
-                    continue;
-                }
-
-                foreach (var path in referencePaths)
-                {
-                    if (libraryPaths.Add(path))
+                    var library = dependencyContext.CompileLibraries[i];
+                    IEnumerable<string> referencePaths;
+                    try
                     {
-                        metadataReferences.Add(CreateMetadataFileReference(path));
+                        referencePaths = library.ResolveReferencePaths();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        continue;
+                    }
+
+                    foreach (var path in referencePaths)
+                    {
+                        if (libraryPaths.Add(path))
+                        {
+                            metadataReferences.Add(CreateMetadataFileReference(path));
+                        }
                     }
                 }
             }

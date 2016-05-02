@@ -4,7 +4,7 @@
 using System;
 using System.Linq;
 using System.Reflection;
-using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Razor.Compilation;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -423,7 +423,7 @@ public class MyNonCustomDefinedClass {}
                 RazorViewEngineOptions viewEngineOptions,
                 IRazorViewEngineFileProviderAccessor fileProviderAccessor)
                 : base(
-                      Mock.Of<IHostingEnvironment>(),
+                      GetManager(),
                       GetAccessor(viewEngineOptions),
                       fileProviderAccessor,
                       NullLoggerFactory.Instance)
@@ -438,7 +438,16 @@ public class MyNonCustomDefinedClass {}
                 return optionsAccessor.Object;
             }
 
-            protected override DependencyContext GetDependencyContext(IHostingEnvironment hostingEnvironment)
+            private static ApplicationPartManager GetManager()
+            {
+                var applicationPartManager = new ApplicationPartManager();
+                var assembly = typeof(DefaultRoslynCompilationServiceTest).GetTypeInfo().Assembly;
+                applicationPartManager.ApplicationParts.Add(new AssemblyPart(assembly));
+
+                return applicationPartManager;
+            }
+
+            protected override DependencyContext GetDependencyContext(Assembly assembly)
                 => _dependencyContext;
         }
     }
