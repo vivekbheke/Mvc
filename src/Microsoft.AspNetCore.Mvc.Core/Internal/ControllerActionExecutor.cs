@@ -47,14 +47,7 @@ namespace Microsoft.AspNetCore.Mvc.Internal
 
                 if (!actionParameters.TryGetValue(parameterInfo.Name, out value))
                 {
-                    if (parameterInfo.HasDefaultValue)
-                    {
-                        value = parameterInfo.DefaultValue;
-                    }
-                    else
-                    {
-                        value = actionMethodExecutor.GetDefaultValueForParameter(index);
-                    }
+                    value = actionMethodExecutor.GetDefaultValueForParameter(index);
                 }
 
                 arguments[index] = value;
