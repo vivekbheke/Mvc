@@ -645,12 +645,12 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
         {
             // Arrange
             var expectedContent =
-                "<link encoded=\"contains &quot;quotes&quot;\" href=\"HtmlEncode[[/css/site.css]]\" " +
+                "<link encoded='contains \"quotes\"' href=\"HtmlEncode[[/css/site.css]]\" " +
                 "literal=\"HtmlEncode[[all HTML encoded]]\" " +
-                "mixed=\"HtmlEncode[[HTML encoded]] and contains &quot;quotes&quot;\" />" +
-                "<link encoded=\"contains &quot;quotes&quot;\" href=\"HtmlEncode[[/base.css]]\" " +
+                "mixed='HtmlEncode[[HTML encoded]] and contains \"quotes\"' />" +
+                "<link encoded='contains \"quotes\"' href=\"HtmlEncode[[/base.css]]\" " +
                 "literal=\"HtmlEncode[[all HTML encoded]]\" " +
-                "mixed=\"HtmlEncode[[HTML encoded]] and contains &quot;quotes&quot;\" />";
+                "mixed='HtmlEncode[[HTML encoded]] and contains \"quotes\"' />";
             var mixed = new DefaultTagHelperContent();
             mixed.Append("HTML encoded");
             mixed.AppendHtml(" and contains \"quotes\"");
@@ -658,18 +658,18 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
                 attributes: new TagHelperAttributeList
                 {
                     { "asp-href-include", "**/*.css" },
-                    { "encoded", new HtmlString("contains \"quotes\"") },
+                    { new TagHelperAttribute("encoded", new HtmlString("contains \"quotes\""), HtmlAttributeStructure.SingleQuotedValue) },
                     { "href", "/css/site.css" },
                     { "literal", "all HTML encoded" },
-                    { "mixed", mixed },
+                    { new TagHelperAttribute("mixed", mixed, HtmlAttributeStructure.SingleQuotedValue) },
                 });
             var output = MakeTagHelperOutput(
                 "link",
                 attributes: new TagHelperAttributeList
                 {
-                    { "encoded", new HtmlString("contains \"quotes\"") },
+                    { new TagHelperAttribute("encoded", new HtmlString("contains \"quotes\""), HtmlAttributeStructure.SingleQuotedValue) },
                     { "literal", "all HTML encoded" },
-                    { "mixed", mixed },
+                    { new TagHelperAttribute("mixed", mixed, HtmlAttributeStructure.SingleQuotedValue) },
                 });
             var hostingEnvironment = MakeHostingEnvironment();
             var viewContext = MakeViewContext();
@@ -842,10 +842,10 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
         public void RenderLinkTags_FallbackHref_WithFileVersion_EncodesAsExpected()
         {
             // Arrange
-            var expectedContent = "<link encoded=\"contains &quot;quotes&quot;\" " +
+            var expectedContent = "<link encoded=\"contains \"quotes\"\" " +
                 "href=\"HtmlEncode[[/css/site.css?v=f4OxZX_x_FO5LcGBSKHWXfwtSx-j1ncoSt3SABJtkGk]]\" " +
                 "literal=\"HtmlEncode[[all HTML encoded]]\" " +
-                "mixed=\"HtmlEncode[[HTML encoded]] and contains &quot;quotes&quot;\" />" +
+                "mixed=\"HtmlEncode[[HTML encoded]] and contains \"quotes\"\" />" +
                 Environment.NewLine +
                 "<meta name=\"x-stylesheet-fallback-test\" content=\"\" class=\"HtmlEncode[[hidden]]\" />" +
                 "<script>!function(a,b,c){var d,e=document,f=e.getElementsByTagName(\"SCRIPT\")," +
@@ -960,8 +960,10 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
             // Assert
             Assert.Equal("link", output.TagName);
             Assert.Equal("/css/site.css?v=f4OxZX_x_FO5LcGBSKHWXfwtSx-j1ncoSt3SABJtkGk", output.Attributes["href"].Value);
-            Assert.Equal("<link rel=\"stylesheet\" href=\"HtmlEncode[[/base.css?v=f4OxZX_x_FO5LcGBSKHWXfwtSx-j1ncoSt3SABJtkGk]]\" />",
-                output.PostElement.GetContent());
+            var content = HtmlContentUtilities.HtmlContentToString(output.PostElement, new HtmlTestEncoder());
+            Assert.Equal(
+                "<link rel=\"stylesheet\" href=\"HtmlEncode[[/base.css?v=f4OxZX_x_FO5LcGBSKHWXfwtSx-j1ncoSt3SABJtkGk]]\" />",
+                content);
         }
 
         private static ViewContext MakeViewContext(string requestPathBase = null)

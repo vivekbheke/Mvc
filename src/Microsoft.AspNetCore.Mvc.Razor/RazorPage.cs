@@ -516,9 +516,14 @@ namespace Microsoft.AspNetCore.Mvc.Razor
         public void BeginAddHtmlAttributeValues(
             TagHelperExecutionContext executionContext,
             string attributeName,
-            int attributeValuesCount)
+            int attributeValuesCount,
+            HtmlAttributeStructure attributeStructure)
         {
-            _tagHelperAttributeInfo = new TagHelperAttributeInfo(executionContext, attributeName, attributeValuesCount);
+            _tagHelperAttributeInfo = new TagHelperAttributeInfo(
+                executionContext,
+                attributeName,
+                attributeValuesCount,
+                attributeStructure);
         }
 
         public void AddHtmlAttributeValue(
@@ -540,7 +545,8 @@ namespace Microsoft.AspNetCore.Mvc.Razor
                     // attribute was removed from TagHelperOutput.Attributes).
                     _tagHelperAttributeInfo.ExecutionContext.AddTagHelperAttribute(
                         _tagHelperAttributeInfo.Name,
-                        value?.ToString() ?? string.Empty);
+                        value?.ToString() ?? string.Empty,
+                        _tagHelperAttributeInfo.AttributeStructure);
                     _tagHelperAttributeInfo.Suppressed = true;
                     return;
                 }
@@ -548,7 +554,8 @@ namespace Microsoft.AspNetCore.Mvc.Razor
                 {
                     _tagHelperAttributeInfo.ExecutionContext.AddHtmlAttribute(
                         _tagHelperAttributeInfo.Name,
-                        _tagHelperAttributeInfo.Name);
+                        _tagHelperAttributeInfo.Name,
+                        _tagHelperAttributeInfo.AttributeStructure);
                     _tagHelperAttributeInfo.Suppressed = true;
                     return;
                 }
@@ -581,7 +588,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor
                 var content = _valueBuffer == null ? HtmlString.Empty : new HtmlString(_valueBuffer.ToString());
                 _valueBuffer?.GetStringBuilder().Clear();
 
-                executionContext.AddHtmlAttribute(_tagHelperAttributeInfo.Name, content);
+                executionContext.AddHtmlAttribute(_tagHelperAttributeInfo.Name, content, _tagHelperAttributeInfo.AttributeStructure);
             }
         }
 
@@ -1025,11 +1032,13 @@ namespace Microsoft.AspNetCore.Mvc.Razor
             public TagHelperAttributeInfo(
                 TagHelperExecutionContext tagHelperExecutionContext,
                 string name,
-                int attributeValuesCount)
+                int attributeValuesCount,
+                HtmlAttributeStructure attributeStructure)
             {
                 ExecutionContext = tagHelperExecutionContext;
                 Name = name;
                 AttributeValuesCount = attributeValuesCount;
+                AttributeStructure = attributeStructure;
 
                 Suppressed = false;
             }
@@ -1039,6 +1048,8 @@ namespace Microsoft.AspNetCore.Mvc.Razor
             public TagHelperExecutionContext ExecutionContext { get; }
 
             public int AttributeValuesCount { get; }
+
+            public HtmlAttributeStructure AttributeStructure { get; }
 
             public bool Suppressed { get; set; }
         }

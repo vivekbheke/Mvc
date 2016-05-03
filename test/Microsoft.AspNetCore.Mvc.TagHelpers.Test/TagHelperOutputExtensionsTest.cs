@@ -979,8 +979,8 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
                 // Normal comparer (TagHelperAttribute.Equals()) doesn't care about the Name case, in tests we do.
                 return attributeX != null &&
                     string.Equals(attributeX.Name, attributeY.Name, StringComparison.Ordinal) &&
-                    attributeX.Minimized == attributeY.Minimized &&
-                    (attributeX.Minimized || Equals(attributeX.Value, attributeY.Value));
+                    attributeX.Structure == attributeY.Structure &&
+                    (attributeX.Structure == HtmlAttributeStructure.Minimized || Equals(attributeX.Value, attributeY.Value));
             }
 
             public int GetHashCode(TagHelperAttribute attribute)

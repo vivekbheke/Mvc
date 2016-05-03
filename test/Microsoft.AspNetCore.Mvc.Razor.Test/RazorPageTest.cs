@@ -1190,7 +1190,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor
                 endTagHelperWritingScope: () => new DefaultTagHelperContent());
 
             // Act
-            page.BeginAddHtmlAttributeValues(executionContext, "someattr", attributeValues.Length);
+            page.BeginAddHtmlAttributeValues(executionContext, "someattr", attributeValues.Length, HtmlAttributeStructure.SingleQuotedValue);
             foreach (var value in attributeValues)
             {
                 page.AddHtmlAttributeValue(value.Item1, value.Item2, value.Item3, value.Item4, 0, value.Item5);
@@ -1203,14 +1203,14 @@ namespace Microsoft.AspNetCore.Mvc.Razor
             Assert.Equal("someattr", htmlAttribute.Name, StringComparer.Ordinal);
             var htmlContent = Assert.IsAssignableFrom<IHtmlContent>(htmlAttribute.Value);
             Assert.Equal(expectedValue, HtmlContentUtilities.HtmlContentToString(htmlContent), StringComparer.Ordinal);
-            Assert.False(htmlAttribute.Minimized);
+            Assert.Equal(HtmlAttributeStructure.SingleQuotedValue, htmlAttribute.Structure);
 
             var context = executionContext.Context;
             var allAttribute = Assert.Single(context.AllAttributes);
             Assert.Equal("someattr", allAttribute.Name, StringComparer.Ordinal);
             htmlContent = Assert.IsAssignableFrom<IHtmlContent>(allAttribute.Value);
             Assert.Equal(expectedValue, HtmlContentUtilities.HtmlContentToString(htmlContent), StringComparer.Ordinal);
-            Assert.False(allAttribute.Minimized);
+            Assert.Equal(HtmlAttributeStructure.SingleQuotedValue, allAttribute.Structure);
         }
 
         [Theory]
@@ -1233,7 +1233,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor
                 endTagHelperWritingScope: () => new DefaultTagHelperContent());
 
             // Act
-            page.BeginAddHtmlAttributeValues(executionContext, "someattr", 1);
+            page.BeginAddHtmlAttributeValues(executionContext, "someattr", 1, HtmlAttributeStructure.DoubleQuotedValue);
             page.AddHtmlAttributeValue(string.Empty, 9, attributeValue, 9, valueLength: 0, isLiteral: false);
             page.EndAddHtmlAttributeValues(executionContext);
 
@@ -1244,7 +1244,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor
             var attribute = Assert.Single(context.AllAttributes);
             Assert.Equal("someattr", attribute.Name, StringComparer.Ordinal);
             Assert.Equal(expectedValue, (string)attribute.Value, StringComparer.Ordinal);
-            Assert.False(attribute.Minimized);
+            Assert.Equal(HtmlAttributeStructure.DoubleQuotedValue, attribute.Structure);
         }
 
         [Fact]
@@ -1263,7 +1263,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor
                 endTagHelperWritingScope: () => new DefaultTagHelperContent());
 
             // Act
-            page.BeginAddHtmlAttributeValues(executionContext, "someattr", 1);
+            page.BeginAddHtmlAttributeValues(executionContext, "someattr", 1, HtmlAttributeStructure.UnquotedValue);
             page.AddHtmlAttributeValue(string.Empty, 9, true, 9, valueLength: 0, isLiteral: false);
             page.EndAddHtmlAttributeValues(executionContext);
 
@@ -1272,12 +1272,12 @@ namespace Microsoft.AspNetCore.Mvc.Razor
             var htmlAttribute = Assert.Single(output.Attributes);
             Assert.Equal("someattr", htmlAttribute.Name, StringComparer.Ordinal);
             Assert.Equal("someattr", (string)htmlAttribute.Value, StringComparer.Ordinal);
-            Assert.False(htmlAttribute.Minimized);
+            Assert.Equal(HtmlAttributeStructure.UnquotedValue, htmlAttribute.Structure);
             var context = executionContext.Context;
             var allAttribute = Assert.Single(context.AllAttributes);
             Assert.Equal("someattr", allAttribute.Name, StringComparer.Ordinal);
             Assert.Equal("someattr", (string)allAttribute.Value, StringComparer.Ordinal);
-            Assert.False(allAttribute.Minimized);
+            Assert.Equal(HtmlAttributeStructure.UnquotedValue, allAttribute.Structure);
         }
 
         public static TheoryData WriteAttributeData

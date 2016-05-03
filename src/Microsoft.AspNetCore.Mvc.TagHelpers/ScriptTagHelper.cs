@@ -4,6 +4,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Html;
@@ -235,7 +236,8 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
                     var index = output.Attributes.IndexOfName(SrcAttributeName);
                     output.Attributes[index] = new TagHelperAttribute(
                         SrcAttributeName,
-                        _fileVersionProvider.AddFileVersionToPath(Src));
+                        _fileVersionProvider.AddFileVersionToPath(Src),
+                        output.Attributes[index].Structure);
                 }
             }
 
@@ -306,7 +308,7 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
                     // Fallback "src" values come from bound attributes and globbing. Must always be non-null.
                     Debug.Assert(src != null);
 
-                    builder.AppendHtml("<script");
+                    StringWriter.Write("<script");
 
                     var addSrc = true;
 
@@ -316,80 +318,90 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
                         var attribute = attributes[i];
                         if (!attribute.Name.Equals(SrcAttributeName, StringComparison.OrdinalIgnoreCase))
                         {
-                            var encodedKey = JavaScriptEncoder.Encode(attribute.Name);
-                            var attributeValue = GetAttributeValue(attribute.Value);
-                            var encodedValue = JavaScriptEncoder.Encode(attributeValue);
-
-                            AppendAttribute(builder, encodedKey, encodedValue, escapeQuotes: true);
+                            //var attributeValue = GetAttributeValueAsContent(attribute.Value);
+                            WriteAttribute(attribute.Name, attribute.Value, attribute.Structure, StringWriter);
                         }
                         else
                         {
                             addSrc = false;
-                            AppendEncodedVersionedSrc(attribute.Name, src, builder, generateForDocumentWrite: true);
+                            WriteEncodedVersionedSrc(attribute.Name, src, attribute.Structure, StringWriter);
                         }
                     }
 
                     if (addSrc)
                     {
-                        AppendEncodedVersionedSrc(SrcAttributeName, src, builder, generateForDocumentWrite: true);
+                        WriteEncodedVersionedSrc(SrcAttributeName, src, HtmlAttributeStructure.DoubleQuotedValue, StringWriter);
                     }
 
-                    builder.AppendHtml("><\\/script>");
+                    StringWriter.Write("></script>");
                 }
+
+                var stringBuilder = StringWriter.GetStringBuilder();
+                var scriptTags = stringBuilder.ToString();
+                stringBuilder.Clear();
+                var encodedScriptTags = JavaScriptEncoder.Encode(scriptTags);
+                builder.AppendHtml(encodedScriptTags);
 
                 builder.AppendHtml("\"));</script>");
             }
         }
 
-        private string GetAttributeValue(object value)
+        private IHtmlContent GetAttributeValueAsContent(object value)
         {
-            string stringValue;
-            var htmlEncodedString = value as HtmlEncodedString;
-            if (htmlEncodedString != null)
+            var htmlContent = value as IHtmlContent;
+            if (htmlContent != null)
             {
-                // Value likely came from an HTML context in the .cshtml file but may still contain double quotes
-                // since attribute could have been enclosed in single quotes.
-                stringValue = htmlEncodedString.Value;
-                stringValue = stringValue.Replace("\"", "&quot;");
-            }
-            else
-            {
-                var writer = StringWriter;
-                RazorPage.WriteTo(writer, HtmlEncoder, value);
-
-                // Value is now correctly HTML-encoded but may still contain double quotes since attribute could
-                // have been enclosed in single quotes and portions that were HtmlEncodedStrings are not re-encoded.
-                var builder = writer.GetStringBuilder();
-                builder.Replace("\"", "&quot;");
-
-                stringValue = builder.ToString();
-                builder.Clear();
+                return htmlContent;
             }
 
-            return stringValue;
+            var stringValue = value as string ?? value.ToString();
+            var encodedStringValue = HtmlEncoder.Encode(stringValue);
+
+            return new HtmlEncodedString(encodedStringValue);
         }
 
-        private void AppendEncodedVersionedSrc(
-            string srcName,
-            string srcValue,
-            TagHelperContent builder,
-            bool generateForDocumentWrite)
+        private string GetVersionedSrc(string srcValue)
         {
             if (AppendVersion == true)
             {
                 srcValue = _fileVersionProvider.AddFileVersionToPath(srcValue);
             }
 
-            if (generateForDocumentWrite)
-            {
-                // srcValue comes from a C# context and globbing. Must HTML-encode it to ensure the
-                // written <script/> element is valid. Must also JavaScript-encode that value to ensure
-                // the document.write() statement is valid.
-                srcValue = HtmlEncoder.Encode(srcValue);
-                srcValue = JavaScriptEncoder.Encode(srcValue);
-            }
+            return srcValue;
+        }
 
-            AppendAttribute(builder, srcName, srcValue, escapeQuotes: generateForDocumentWrite);
+        private void AppendVersionedSrc(
+            string srcName,
+            string srcValue,
+            HtmlAttributeStructure structure,
+            IHtmlContentBuilder builder)
+        {
+            srcValue = GetVersionedSrc(srcValue);
+
+            AppendAttribute(srcName, srcValue, structure, builder);
+        }
+
+        private void WriteEncodedVersionedSrc(
+            string srcName,
+            string srcValue,
+            HtmlAttributeStructure structure,
+            TextWriter writer)
+        {
+            srcValue = GetVersionedSrc(srcValue);
+
+            WriteAttribute(srcName, srcValue, structure, writer);
+        }
+
+        private void WriteAttribute(string key, object value, HtmlAttributeStructure structure, TextWriter writer)
+        {
+            writer.Write(' ');
+            TagHelperAttribute.WriteTo(key, value, structure, writer, HtmlEncoder);
+        }
+
+        private void AppendAttribute(string key, object value, HtmlAttributeStructure structure, IHtmlContentBuilder builder)
+        {
+            builder.AppendHtml(" ");
+            TagHelperAttribute.CopyTo(key, value, structure, builder);
         }
 
         private void EnsureGlobbingUrlBuilder()
@@ -429,44 +441,21 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
                 var attribute = attributes[i];
                 if (!attribute.Name.Equals(SrcAttributeName, StringComparison.OrdinalIgnoreCase))
                 {
-                    AppendAttribute(builder, attribute.Name, attribute.Value, escapeQuotes: false);
+                    AppendAttribute(attribute.Name, attribute.Value, attribute.Structure, builder);
                 }
                 else
                 {
                     addSrc = false;
-                    AppendEncodedVersionedSrc(attribute.Name, src, builder, generateForDocumentWrite: false);
+                    AppendVersionedSrc(attribute.Name, src, attribute.Structure, builder);
                 }
             }
 
             if (addSrc)
             {
-                AppendEncodedVersionedSrc(SrcAttributeName, src, builder, generateForDocumentWrite: false);
+                AppendVersionedSrc(SrcAttributeName, src, HtmlAttributeStructure.DoubleQuotedValue, builder);
             }
 
             builder.AppendHtml("></script>");
-        }
-
-        private void AppendAttribute(TagHelperContent content, string key, object value, bool escapeQuotes)
-        {
-            content
-                .AppendHtml(" ")
-                .AppendHtml(key);
-            if (escapeQuotes)
-            {
-                // Passed only JavaScript-encoded strings in this case. Do not perform HTML-encoding as well.
-                content
-                    .AppendHtml("=\\\"")
-                    .AppendHtml((string)value)
-                    .AppendHtml("\\\"");
-            }
-            else
-            {
-                // HTML-encode the given value if necessary.
-                content
-                    .AppendHtml("=\"")
-                    .Append(HtmlEncoder, value)
-                    .AppendHtml("\"");
-            }
         }
 
         private enum Mode

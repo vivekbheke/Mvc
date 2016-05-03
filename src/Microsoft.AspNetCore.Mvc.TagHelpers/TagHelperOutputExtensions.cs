@@ -161,7 +161,7 @@ namespace Microsoft.AspNetCore.Mvc.TagHelpers
             var copiedAttribute = new TagHelperAttribute(
                 existingAttribute.Name,
                 existingAttribute.Value,
-                existingAttribute.Minimized);
+                existingAttribute.Structure);
 
             // Move backwards through context.AllAttributes from the provided index until we find a familiar attribute
             // in tagHelperOutput where we can insert the copied value after the familiar one.
