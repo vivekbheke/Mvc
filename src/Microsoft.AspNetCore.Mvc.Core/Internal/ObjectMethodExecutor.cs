@@ -33,49 +33,6 @@ namespace Microsoft.AspNetCore.Mvc.Internal
 
         private static readonly MethodInfo _coerceMethod = ((MethodCallExpression)_coerceTaskExpression.Body).Method;
 
-        private object[] ParameterDefaultValues
-        {
-            get
-            {
-                if (_parameterDefaultValues == null)
-                {
-                    var count = ActionParameters.Length;
-                    _parameterDefaultValues = new object[count];
-
-                    for (var i = 0; i < count; i++)
-                    {
-                        var parameterInfo = ActionParameters[i];
-                        object defaultValue = null;
-
-                        if (parameterInfo.HasDefaultValue)
-                        {
-                            defaultValue = parameterInfo.DefaultValue;
-                        }
-                        else
-                        {
-                            var defaultValueAttribute = parameterInfo
-                            .GetCustomAttribute<DefaultValueAttribute>(inherit: false);
-
-                            if (defaultValueAttribute?.Value == null)
-                            {
-                                defaultValue = parameterInfo.ParameterType.GetTypeInfo().IsValueType
-                                    ? Activator.CreateInstance(parameterInfo.ParameterType)
-                                    : null;
-                            }
-                            else
-                            {
-                                defaultValue = defaultValueAttribute.Value;
-                            }
-                        }
-
-                        _parameterDefaultValues[i] = defaultValue;
-                    }
-                }
-
-                return _parameterDefaultValues;
-            }
-        }
-
         private ObjectMethodExecutor(MethodInfo methodInfo)
         {            
             if (methodInfo == null)
@@ -121,7 +78,9 @@ namespace Microsoft.AspNetCore.Mvc.Internal
                 throw new ArgumentOutOfRangeException(nameof(index));
             }
 
-            return ParameterDefaultValues[index];
+            EnsureParameterDefaultValues();
+
+            return _parameterDefaultValues[index];
         }
 
         private static ActionExecutor GetExecutor(MethodInfo methodInfo, TypeInfo targetTypeInfo)
@@ -294,6 +253,44 @@ namespace Microsoft.AspNetCore.Mvc.Internal
         {
             var task = (Task<T>)taskAsObject;
             return CastToObject<T>(task);
+        }
+
+        private void EnsureParameterDefaultValues()
+        {
+            if (_parameterDefaultValues == null)
+            {
+                var count = ActionParameters.Length;
+                _parameterDefaultValues = new object[count];
+
+                for (var i = 0; i < count; i++)
+                {
+                    var parameterInfo = ActionParameters[i];
+                    object defaultValue;
+
+                    if (parameterInfo.HasDefaultValue)
+                    {
+                        defaultValue = parameterInfo.DefaultValue;
+                    }
+                    else
+                    {
+                        var defaultValueAttribute = parameterInfo
+                            .GetCustomAttribute<DefaultValueAttribute>(inherit: false);
+
+                        if (defaultValueAttribute?.Value == null)
+                        {
+                            defaultValue = parameterInfo.ParameterType.GetTypeInfo().IsValueType
+                                ? Activator.CreateInstance(parameterInfo.ParameterType)
+                                : null;
+                        }
+                        else
+                        {
+                            defaultValue = defaultValueAttribute.Value;
+                        }
+                    }
+
+                    _parameterDefaultValues[i] = defaultValue;
+                }
+            }
         }
     }
 }
